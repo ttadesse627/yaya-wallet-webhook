@@ -4,7 +4,7 @@
 
 To run this project,
 
-- Install the .Net 8 sdk
+- Install the .Net 8 sdk and install it
 - Clone the project and open it
 - Run the project from terminal by typing `dotnet run`
 
