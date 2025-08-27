@@ -1,7 +1,11 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
 using System.Text.Json;
+using Newtonsoft.Json;
+using System.Security.Cryptography;
+using System.Text;
 using Yaya.Webhook.API.Models;
+using Newtonsoft.Json.Linq;
 
 namespace Yaya.Webhook.API;
 
@@ -44,7 +48,7 @@ public class WebhookController: ControllerBase
             }
 
             _ = Task.Run(() => _webhookProcessor.ProcessWebhookAsync(validationResult.Payload));
-            return Ok("Webhook received successfully");
+            return new EmptyResult();
         }
         catch (Exception ex)
         {
@@ -82,6 +86,16 @@ public class WebhookController: ControllerBase
             result.ErrorMessage = "Timestamp outside tolerance window";
             return result;
         }
+
+        // 5. Compute expected signature
+        var expectedSignature = ComputeSignature(rawRequestBody);
+
+        // 6. Compare signatures
+        if (!SecureEquals(expectedSignature, headerSignature!))
+        {
+            result.ErrorMessage = "Signature verification failed";
+            return result;
+        }
         return result;
     }
 
@@ -102,5 +116,44 @@ public class WebhookController: ControllerBase
         var currentTime = DateTime.UtcNow;
         var difference = currentTime - receivedTime;
         return difference.TotalSeconds <= _settings.SignatureToleranceSeconds;
+    }
+    private string ComputeSignature(string payload)
+    {
+
+        var payloadValues = ExtractValuesFromJson(payload);
+        var signedPayload = string.Join("", payloadValues);
+
+        using var hmac = new HMACSHA256(Encoding.UTF8.GetBytes(_settings.SecretKey));
+        var hash = hmac.ComputeHash(Encoding.UTF8.GetBytes(signedPayload));
+        return Convert.ToBase64String(hash);
+    }
+    private static List<string> ExtractValuesFromJson(string json)
+    {
+        var values = new List<string>();
+        var jObject = JsonConvert.DeserializeObject<JObject>(json);
+
+        if (jObject != null)
+        {
+            foreach (var property in jObject.Properties())
+            {
+                values.Add(property.Value.ToString());
+            }
+        }
+
+        return values;
+    }
+
+    private static bool SecureEquals(string a, string b)
+    {
+        // Used constant-time comparison to prevent timing attacks
+        if (a.Length != b.Length) return false;
+
+        var result = 0;
+        for (var i = 0; i < a.Length; i++)
+        {
+            result |= a[i] ^ b[i];
+        }
+        return result == 0;
+
     }
 }
