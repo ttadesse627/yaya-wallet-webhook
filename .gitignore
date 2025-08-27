@@ -1,0 +1,6 @@
+bin/
+obj/
+.vscode/
+net8.0/
+Properties/
+Notes/
