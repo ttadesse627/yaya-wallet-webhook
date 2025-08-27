@@ -9,7 +9,7 @@ using Microsoft.Extensions.Options;
 namespace Yaya.Webhook.API.Services;
 public interface IWebhookValidator
 {
-    Task<WebhookValidationResult> ValidateWebhookRequest(string request, HttpRequest httpRequest);
+    Task<WebhookValidationResult> ValidateWebhookRequest(string request, string headers, string? remoteIp);
 }
 public class WebhookValidator: IWebhookValidator
 {
@@ -18,20 +18,20 @@ public class WebhookValidator: IWebhookValidator
     {
         _settings = settings.Value;
     }
-    public async Task<WebhookValidationResult> ValidateWebhookRequest(string request, HttpRequest httpRequest)
+    public async Task<WebhookValidationResult> ValidateWebhookRequest(string request, string signature, string? remoteIp)
     {
         await Task.CompletedTask;
         var result = new WebhookValidationResult();
 
         // 1. Check IP address against whitelist
-        if (!IsRequestFromTrustedIp(httpRequest))
+        if (!IsRequestFromTrustedIp(remoteIp))
         {
             result.ErrorMessage = "Untrusted IP address";
             return result;
         }
 
         // 2. Verify the presence of the YAYA-SIGNATURE header
-        if (!httpRequest.Headers.TryGetValue("YAYA-SIGNATURE", out var headerSignature))
+        if (string.IsNullOrEmpty(signature))
         {
             result.ErrorMessage = "Missing the signature";
             return result;
@@ -52,7 +52,7 @@ public class WebhookValidator: IWebhookValidator
         var expectedSignature = ComputeSignature(request);
 
         // 6. Compare signatures
-        if (!SecureEquals(expectedSignature, headerSignature!))
+        if (!SecureEquals(expectedSignature, signature!))
         {
             result.ErrorMessage = "Signature verification failed";
             return result;
@@ -71,10 +71,9 @@ public class WebhookValidator: IWebhookValidator
         return result;
     }
 
-    private bool IsRequestFromTrustedIp(HttpRequest request)
+    private bool IsRequestFromTrustedIp(string clientIp)
     {
         // Compare the server's IP (stored in the setting) with the request IP to ensure the request is from Yaya Wallet
-        var clientIp = request.HttpContext.Connection.RemoteIpAddress?.ToString();
         if (!string.IsNullOrEmpty(clientIp))
         {
             return _settings.AllowedIPs.Contains(clientIp);
