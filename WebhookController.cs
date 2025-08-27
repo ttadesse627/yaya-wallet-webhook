@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Options;
+using System.Text.Json;
 using Yaya.Webhook.API.Models;
 
 namespace Yaya.Webhook.API;
@@ -64,6 +65,23 @@ public class WebhookController: ControllerBase
             return result;
         }
 
+        // 2. Verify the presence of the YAYA-SIGNATURE header
+        if (!Request.Headers.TryGetValue("YAYA-SIGNATURE", out var headerSignature))
+        {
+            result.ErrorMessage = "Missing the signature";
+            return result;
+        }
+
+        // 3. Get the timestamp sent from the server;
+        using var doc = JsonDocument.Parse(rawRequestBody);
+        var timestamp = doc.RootElement.GetProperty("timestamp").GetInt64();
+
+        // 4. Check timestamp tolerance to prevent replay attacks
+        if (!IsTimestampWithinTolerance(timestamp))
+        {
+            result.ErrorMessage = "Timestamp outside tolerance window";
+            return result;
+        }
         return result;
     }
 
@@ -77,5 +95,12 @@ public class WebhookController: ControllerBase
         }
 
         return false;
+    }
+    private bool IsTimestampWithinTolerance(long timestamp)
+    {
+        var receivedTime = DateTimeOffset.FromUnixTimeMilliseconds(timestamp).UtcDateTime;
+        var currentTime = DateTime.UtcNow;
+        var difference = currentTime - receivedTime;
+        return difference.TotalSeconds <= _settings.SignatureToleranceSeconds;
     }
 }
