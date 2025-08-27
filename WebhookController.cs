@@ -96,6 +96,17 @@ public class WebhookController: ControllerBase
             result.ErrorMessage = "Signature verification failed";
             return result;
         }
+
+        // 7. Deserialize payload if validation passed
+        try
+        {
+            result.Payload = JsonConvert.DeserializeObject<WebhookPayload>(rawRequestBody)!;
+            result.IsValid = true;
+        }
+        catch (Exception ex)
+        {
+            result.ErrorMessage = $"Invalid payload format: {ex.Message}";
+        }
         return result;
     }
 
