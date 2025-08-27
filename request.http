@@ -1,0 +1,18 @@
+@host = http://localhost:8000
+
+###
+POST {{host}}/api/webhook/transaction HTTP/1.1
+Content-Type: application/json
+YAYA-SIGNATURE: e14nlYxVNVTPRqTG1MB5v4kMEBx8yeS9YoptnyVbADk=
+
+{
+  "id": "1dd2854e-3a79-4548-ae36-97e4a18ebf81",
+  "amount": 100,
+  "currency": "ETB",
+  "created_at_time": 1673381836,
+  "timestamp": 1756223804,
+  "cause": "Testing",
+  "full_name": "Abebe Kebede",
+  "account_name": "abebekebede1",
+  "invoice_url": "https://yayawallet.com/en/invoice/xxxx"
+}
